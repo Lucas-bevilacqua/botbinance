@@ -117,14 +117,14 @@ def get_signals(df):
     last_rsi  = rsi.iloc[-1]
     last_ema  = ema200.iloc[-1]
     last_close= close.iloc[-1]
-    bull_flip = (prev_dir == -1) and (curr_dir == 1)
-    bear_flip = (prev_dir == 1)  and (curr_dir == -1)
+    bull_signal = curr_dir == 1   # ST verde (não precisa de flip)
+    bear_signal = curr_dir == -1  # ST vermelho (não precisa de flip)
     above_ema = last_close > last_ema
     below_ema = last_close < last_ema
     rsi_ok    = RSI_MIN <= last_rsi <= RSI_MAX
     return {
-        "buy":        bull_flip and above_ema and rsi_ok,
-        "sell":       bear_flip and below_ema and rsi_ok,
+        "buy":        bull_signal and above_ema and rsi_ok,
+        "sell":       bear_signal and below_ema and rsi_ok,
         "exit_long":  curr_dir == -1,
         "exit_short": curr_dir == 1,
         "rsi":        round(last_rsi, 2),
