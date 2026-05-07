@@ -166,7 +166,8 @@ def set_leverage(client, symbol, leverage):
     except BinanceAPIException:
         pass
 
-def pick_best_pair(client):
+def rank_pairs(client):
+    """Retorna todos os pares ordenados por volume x momentum."""
     tickers = {t["symbol"]: t for t in client.futures_ticker()}
     scores  = {}
     for symbol in CANDIDATE_PAIRS:
@@ -176,10 +177,7 @@ def pick_best_pair(client):
         change = abs(float(t["priceChangePercent"]))
         if volume < 10_000_000: continue
         scores[symbol] = volume * change
-    if not scores: return None
-    best = max(scores, key=scores.get)
-    log.info(f"🔍 Par selecionado: {best}")
-    return best
+    return sorted(scores, key=scores.get, reverse=True)
 
 # ─── BOT ──────────────────────────────────────────────────────────────────────
 
@@ -230,19 +228,25 @@ class SuperTrendScalpBot:
         if balance < 1.0:
             log.warning("⚠️  Saldo insuficiente."); return
 
-        symbol = pick_best_pair(self.client)
-        if not symbol:
-            log.info("😴 Aguardando oportunidade..."); return
+        pairs = rank_pairs(self.client)
+        if not pairs:
+            log.info("😴 Nenhum par com volume suficiente."); return
 
-        set_leverage(self.client, symbol, LEVERAGE)
-        df      = get_klines(self.client, symbol)
-        signals = get_signals(df)
-        log.info(f"📈 {symbol} | close={signals['close']} | ST={'🟢' if signals['st_dir']==1 else '🔴'} | RSI={signals['rsi']} | EMA200={signals['ema200']} | BUY={signals['buy']} SELL={signals['sell']}")
-
-        if signals["buy"]:
-            self._open_trade(symbol, balance, "LONG", signals)
-        elif signals["sell"]:
-            self._open_trade(symbol, balance, "SHORT", signals)
+        log.info(f"🔎 Varrendo {len(pairs)} pares: {', '.join(pairs)}")
+        found = False
+        for symbol in pairs:
+            set_leverage(self.client, symbol, LEVERAGE)
+            df      = get_klines(self.client, symbol)
+            signals = get_signals(df)
+            log.info(f"  {symbol} | close={signals['close']} | ST={'🟢' if signals['st_dir']==1 else '🔴'} | RSI={signals['rsi']} | BUY={signals['buy']} SELL={signals['sell']}")
+            if signals["buy"]:
+                self._open_trade(symbol, balance, "LONG", signals)
+                found = True; break
+            elif signals["sell"]:
+                self._open_trade(symbol, balance, "SHORT", signals)
+                found = True; break
+        if not found:
+            log.info("😴 Nenhum sinal em nenhum par. Aguardando...")
 
     def _open_trade(self, symbol, balance, side, signals):
         price     = get_futures_price(self.client, symbol)
