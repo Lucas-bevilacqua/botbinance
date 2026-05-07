@@ -21,6 +21,7 @@ REGRAS DE SAÍDA:
 import os
 import time
 import logging
+import requests
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import pandas as pd
@@ -29,6 +30,7 @@ import numpy as np
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 API_KEY    = os.getenv("BINANCE_API_KEY", "")
 API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 SUPERTREND_ATR_PERIOD  = 7
 SUPERTREND_MULTIPLIER  = 2.0
@@ -170,6 +172,46 @@ def set_leverage(client, symbol, leverage):
     except BinanceAPIException:
         pass
 
+
+def ask_gemini(symbol: str, side: str, signals: dict, candles: list) -> bool:
+    """
+    Consulta o Gemini Flash para confirmar ou bloquear a entrada.
+    Retorna True se confirmado, False se bloqueado.
+    """
+    if not GEMINI_API_KEY:
+        return True  # Se não tiver chave, não filtra
+
+    # Monta contexto dos últimos 5 candles
+    recent = candles[-5:]
+    candle_summary = " | ".join([
+        f"c={float(c[4]):.4f} v={float(c[5]):.0f}"
+        for c in recent
+    ])
+
+    prompt = f"""Você é um analista de futuros de criptomoedas.
+Par: {symbol} | Direção: {side}
+SuperTrend: {"VERDE (bullish)" if signals["st_dir"] == 1 else "VERMELHO (bearish)"}
+RSI({RSI_PERIOD}): {signals["rsi"]}
+EMA200: {signals["ema200"]} | Preço atual: {signals["close"]}
+Últimos 5 candles (close | volume): {candle_summary}
+
+Com base nesses dados, devo entrar em {side} agora?
+Responda APENAS com uma linha no formato:
+CONFIRMAR ou BLOQUEAR: [motivo curto em português]"""
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        resp = requests.post(url, json={
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 60}
+        }, timeout=8)
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        log.info(f"🤖 Gemini [{symbol}]: {text}")
+        return text.upper().startswith("CONFIRMAR")
+    except Exception as e:
+        log.warning(f"⚠️  Gemini indisponível: {e}. Prosseguindo sem filtro.")
+        return True
+
 def rank_pairs(client):
     """Retorna todos os pares ordenados por volume x momentum."""
     tickers = {t["symbol"]: t for t in client.futures_ticker()}
@@ -293,6 +335,13 @@ class SuperTrendScalpBot:
         qty       = round_step((capital * LEVERAGE) / price, lot["step_size"])
         if qty < lot["min_qty"]:
             log.warning(f"⚠️  Qty {qty} abaixo do mínimo {lot['min_qty']}"); return
+
+        # Filtro Gemini — confirma ou bloqueia a entrada
+        raw_candles = get_klines(self.client, symbol).values.tolist()
+        if not ask_gemini(symbol, side, signals, raw_candles):
+            log.info(f"🚫 Gemini bloqueou entrada em {side} {symbol}. Aguardando próxima oportunidade.")
+            return
+
         try:
             order = self.client.futures_create_order(symbol=symbol, side="BUY" if side=="LONG" else "SELL", type="MARKET", quantity=qty)
             entry = float(order["avgPrice"]) if float(order.get("avgPrice",0)) > 0 else price
