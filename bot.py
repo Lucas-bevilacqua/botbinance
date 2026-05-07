@@ -188,6 +188,36 @@ class SuperTrendScalpBot:
         log.info("✅ Bot conectado à Binance Futures")
         log.info(f"📐 SuperTrend(ATR={SUPERTREND_ATR_PERIOD}, mult={SUPERTREND_MULTIPLIER}) + RSI({RSI_PERIOD}) + EMA{EMA_TREND_PERIOD}")
         log.info(f"⚙️  Alavancagem: {LEVERAGE}x | Risco: {RISK_PER_TRADE*100:.0f}%/trade | R:R=1:{REWARD_RISK_RATIO}")
+        self._sync_open_positions()
+
+    def _sync_open_positions(self):
+        """Ao iniciar, verifica se já tem posição aberta na Binance (evita abrir duplicata após restart)."""
+        try:
+            positions = self.client.futures_position_information()
+            for p in positions:
+                amt = float(p["positionAmt"])
+                if amt == 0:
+                    continue
+                symbol = p["symbol"]
+                side   = "LONG" if amt > 0 else "SHORT"
+                entry  = float(p["entryPrice"])
+                qty    = abs(amt)
+                lot    = get_lot_size(self.client, symbol)
+                price  = get_futures_price(self.client, symbol)
+                stop_dist = 0.008
+                stop   = entry * (1 - stop_dist) if side == "LONG" else entry * (1 + stop_dist)
+                target = entry * (1 + stop_dist * REWARD_RISK_RATIO) if side == "LONG" else entry * (1 - stop_dist * REWARD_RISK_RATIO)
+                self.open_trade = {
+                    "symbol": symbol, "side": side, "qty": qty,
+                    "entry": entry, "stop": round(stop, 8), "target": round(target, 8),
+                    "order_id": None, "opened_at": time.time(),
+                }
+                log.info(f"🔄 Posição existente detectada: {side} {symbol} | qty={qty} | entrada={entry:.4f}")
+                break
+            if not self.open_trade:
+                log.info("📭 Nenhuma posição aberta encontrada. Pronto para operar.")
+        except BinanceAPIException as e:
+            log.error(f"Erro ao sincronizar posições: {e}")
 
     def run(self):
         log.info("🚀 SuperTrend Scalp Bot iniciado")
