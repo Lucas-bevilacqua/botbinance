@@ -43,9 +43,13 @@ MAX_TRADE_DURATION     = 600
 SCAN_INTERVAL_SEC      = 20
 
 CANDIDATE_PAIRS = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT",
-    "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT",
-    "LINKUSDT", "MATICUSDT"
+    # Tier 1 — alta liquidez
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    # Tier 2 — médio cap, mais voláteis
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
+    # Tier 3 — altcoins com bom volume
+    "LTCUSDT", "UNIUSDT", "ATOMUSDT", "NEARUSDT", "APTUSDT",
+    "ARBUSDT", "OPUSDT", "INJUSDT", "SUIUSDT", "TIAUSDT"
 ]
 
 logging.basicConfig(
