@@ -656,8 +656,8 @@ class AggressiveScalpBot:
                 quantity=t["qty"],
                 reduceOnly=True
             )
-            capital = _current_balance * RISK_PER_TRADE
-            pnl_dollar = (pnl_pct / 100) * capital
+            # PnL real = variacao de preco * quantidade
+            pnl_dollar = (price - t["entry"]) * t["qty"] * (1 if t["side"] == "LONG" else -1)
             log.info(f"FECHOU [{reason}] {t['symbol']} | saida={price:.4f} | PnL={pnl_pct:+.2f}% | ${pnl_dollar:+.4f}")
             db_log_trade(
                 t["symbol"], t["side"], t["entry"], price,
