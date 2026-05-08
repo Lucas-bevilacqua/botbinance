@@ -507,6 +507,18 @@ def api_stats():
 def health():
     return jsonify({"status": "ok", "ts": datetime.utcnow().isoformat()})
 
+@app.route('/api/reset', methods=['POST'])
+def reset_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("DELETE FROM trades")
+        conn.execute("DELETE FROM balance_log")
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok", "message": "Banco limpo"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 def run_flask():
     app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
 
