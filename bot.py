@@ -1,9 +1,10 @@
 """
-Binance Futures Scalping Bot
-Estrategia: EMA Cross (9/21) + RSI(14) + EMA200
-LONG:  EMA9 cruza acima EMA21 + preco > EMA200 + RSI 45-65
-SHORT: EMA9 cruza abaixo EMA21 + preco < EMA200 + RSI 35-55
-Stop: 1.5x ATR | Target: 2x risco | Timeout: 10min
+Binance Futures Aggressive Scalping Bot
+Estrategia: EMA Cross (5/13) + RSI(7) + Volume Spike
+Timeframe: 1min | Alavancagem: 10x
+LONG:  EMA5 cruza acima EMA13 + volume > media + RSI 35-65 + preco > EMA50
+SHORT: EMA5 cruza abaixo EMA13 + volume > media + RSI 35-65 + preco < EMA50
+Stop: 1x ATR | Target: 2x risco | Timeout: 5min
 """
 
 import os
@@ -20,17 +21,22 @@ API_KEY        = os.getenv("BINANCE_API_KEY", "")
 API_SECRET     = os.getenv("BINANCE_API_SECRET", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-EMA_FAST         = 9
-EMA_SLOW         = 21
-EMA_TREND        = 200
-RSI_PERIOD       = 14
-ATR_PERIOD       = 14
-ATR_STOP_MULT    = 1.5
-LEVERAGE         = 10
-RISK_PER_TRADE   = 0.05
-REWARD_RISK      = 2.0
-MAX_DURATION     = 600
-SCAN_INTERVAL    = 20
+EMA_FAST       = 5
+EMA_SLOW       = 13
+EMA_TREND      = 50
+RSI_PERIOD     = 7
+RSI_MIN        = 35
+RSI_MAX        = 65
+ATR_PERIOD     = 7
+ATR_STOP_MULT  = 1.0
+VOL_MA_PERIOD  = 20
+VOL_SPIKE_MULT = 1.2      # volume 20% acima da media
+LEVERAGE       = 10
+RISK_PER_TRADE = 0.05
+REWARD_RISK    = 2.0
+MAX_DURATION   = 300      # 5 minutos
+SCAN_INTERVAL  = 10       # varre a cada 10 segundos
+TIMEFRAME      = "1m"
 
 CANDIDATE_PAIRS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
@@ -69,49 +75,53 @@ def calc_atr(df, period):
 
 def get_signals(df):
     close    = df["close"]
-    ema_fast = calc_ema(close, EMA_FAST)
-    ema_slow = calc_ema(close, EMA_SLOW)
-    ema_trend= calc_ema(close, EMA_TREND)
-    rsi      = calc_rsi(close, RSI_PERIOD)
-    atr      = calc_atr(df, ATR_PERIOD)
+    volume   = df["volume"]
 
-    # Cruzamento atual e anterior
+    ema_fast  = calc_ema(close, EMA_FAST)
+    ema_slow  = calc_ema(close, EMA_SLOW)
+    ema_trend = calc_ema(close, EMA_TREND)
+    rsi       = calc_rsi(close, RSI_PERIOD)
+    atr       = calc_atr(df, ATR_PERIOD)
+    vol_ma    = volume.rolling(VOL_MA_PERIOD).mean()
+
+    # Cruzamento
     cross_up_now  = ema_fast.iloc[-1] > ema_slow.iloc[-1]
     cross_up_prev = ema_fast.iloc[-2] > ema_slow.iloc[-2]
     cross_dn_now  = ema_fast.iloc[-1] < ema_slow.iloc[-1]
     cross_dn_prev = ema_fast.iloc[-2] < ema_slow.iloc[-2]
 
-    # Sinal de entrada: momento do cruzamento
     bull_cross = cross_up_now and not cross_up_prev
     bear_cross = cross_dn_now and not cross_dn_prev
 
-    last_close = close.iloc[-1]
-    last_ema_t = ema_trend.iloc[-1]
-    last_rsi   = rsi.iloc[-1]
-    last_atr   = atr.iloc[-1]
+    last_close  = close.iloc[-1]
+    last_trend  = ema_trend.iloc[-1]
+    last_rsi    = rsi.iloc[-1]
+    last_atr    = atr.iloc[-1]
+    last_vol    = volume.iloc[-1]
+    last_vol_ma = vol_ma.iloc[-1]
 
-    above_trend = last_close > last_ema_t
-    below_trend = last_close < last_ema_t
-
-    rsi_long  = 45 <= last_rsi <= 65
-    rsi_short = 35 <= last_rsi <= 55
+    vol_spike   = last_vol >= last_vol_ma * VOL_SPIKE_MULT
+    rsi_ok      = RSI_MIN <= last_rsi <= RSI_MAX
+    above_trend = last_close > last_trend
+    below_trend = last_close < last_trend
 
     return {
-        "buy":        bull_cross and above_trend and rsi_long,
-        "sell":       bear_cross and below_trend and rsi_short,
+        "buy":        bull_cross and above_trend and rsi_ok and vol_spike,
+        "sell":       bear_cross and below_trend and rsi_ok and vol_spike,
         "exit_long":  cross_dn_now,
         "exit_short": cross_up_now,
         "rsi":        round(last_rsi, 2),
         "ema_fast":   round(ema_fast.iloc[-1], 6),
         "ema_slow":   round(ema_slow.iloc[-1], 6),
-        "ema_trend":  round(last_ema_t, 6),
+        "ema_trend":  round(last_trend, 6),
         "atr":        round(last_atr, 6),
+        "vol_spike":  vol_spike,
         "close":      round(last_close, 6),
     }
 
 # HELPERS
 
-def get_klines(client, symbol, interval="3m", limit=250):
+def get_klines(client, symbol, interval=TIMEFRAME, limit=150):
     raw = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
     df  = pd.DataFrame(raw, columns=["time","open","high","low","close","volume",
                                       "close_time","qa_vol","trades","taker_buy","taker_buy_qa","ignore"])
@@ -153,10 +163,11 @@ def ask_gemini(symbol, side, signals, candles):
         return True
     recent = candles[-5:]
     candle_summary = " | ".join([f"c={float(c[4]):.4f} v={float(c[5]):.0f}" for c in recent])
-    prompt = f"""Voce e um analista de futuros de criptomoedas.
+    prompt = f"""Voce e um scalper agressivo de futuros de criptomoedas em 1min.
 Par: {symbol} | Direcao: {side}
-EMA9={signals['ema_fast']} EMA21={signals['ema_slow']} EMA200={signals['ema_trend']}
-RSI(14): {signals['rsi']} | ATR: {signals['atr']} | Preco: {signals['close']}
+EMA5={signals['ema_fast']} EMA13={signals['ema_slow']} EMA50={signals['ema_trend']}
+RSI(7): {signals['rsi']} | ATR: {signals['atr']} | Volume spike: {signals['vol_spike']}
+Preco: {signals['close']}
 Ultimos 5 candles (close | volume): {candle_summary}
 
 Devo entrar em {side} agora?
@@ -169,13 +180,13 @@ Responda APENAS: CONFIRMAR ou BLOQUEAR: [motivo curto]"""
         }, timeout=8)
         data = resp.json()
         if "candidates" not in data:
-            log.warning(f"Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo sem filtro.")
+            log.warning(f"Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo.")
             return True
         text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         log.info(f"Gemini [{symbol}]: {text}")
         return text.upper().startswith("CONFIRMAR")
     except Exception as e:
-        log.warning(f"Gemini indisponivel: {e}. Prosseguindo sem filtro.")
+        log.warning(f"Gemini indisponivel: {e}. Prosseguindo.")
         return True
 
 def rank_pairs(client):
@@ -192,13 +203,13 @@ def rank_pairs(client):
 
 # BOT
 
-class EMAScalpBot:
+class AggressiveScalpBot:
     def __init__(self):
         self.client     = Client(API_KEY, API_SECRET)
         self.open_trade = None
         log.info("Bot conectado a Binance Futures")
-        log.info(f"Estrategia: EMA{EMA_FAST}/{EMA_SLOW} Cross + RSI({RSI_PERIOD}) + EMA{EMA_TREND}")
-        log.info(f"Alavancagem: {LEVERAGE}x | Risco: {RISK_PER_TRADE*100:.0f}%/trade | R:R=1:{REWARD_RISK}")
+        log.info(f"Estrategia AGRESSIVA: EMA{EMA_FAST}/{EMA_SLOW} + RSI({RSI_PERIOD}) + Volume | TF={TIMEFRAME}")
+        log.info(f"Alavancagem: {LEVERAGE}x | Risco: {RISK_PER_TRADE*100:.0f}%/trade | R:R=1:{REWARD_RISK} | Timeout={MAX_DURATION}s")
         self._sync_open_positions()
 
     def _sync_open_positions(self):
@@ -211,7 +222,7 @@ class EMAScalpBot:
                 side   = "LONG" if amt > 0 else "SHORT"
                 entry  = float(p["entryPrice"])
                 qty    = abs(amt)
-                stop_dist = 0.008
+                stop_dist = 0.006
                 stop   = entry * (1 - stop_dist) if side == "LONG" else entry * (1 + stop_dist)
                 target = entry * (1 + stop_dist * REWARD_RISK) if side == "LONG" else entry * (1 - stop_dist * REWARD_RISK)
                 self.open_trade = {
@@ -219,7 +230,7 @@ class EMAScalpBot:
                     "entry": entry, "stop": round(stop, 8), "target": round(target, 8),
                     "order_id": None, "opened_at": time.time(),
                 }
-                log.info(f"Posicao existente: {side} {symbol} | qty={qty} | entrada={entry:.4f}")
+                log.info(f"Posicao existente: {side} {symbol} | entrada={entry:.4f}")
                 break
             if not self.open_trade:
                 log.info("Nenhuma posicao aberta. Pronto para operar.")
@@ -227,7 +238,7 @@ class EMAScalpBot:
             log.error(f"Erro ao sincronizar: {e}")
 
     def run(self):
-        log.info("EMA Scalp Bot iniciado")
+        log.info("Aggressive Scalp Bot iniciado")
         while True:
             try:
                 self._cycle()
@@ -275,7 +286,7 @@ class EMAScalpBot:
             set_leverage(self.client, symbol, LEVERAGE)
             df      = get_klines(self.client, symbol)
             signals = get_signals(df)
-            log.info(f"  {symbol} | close={signals['close']} | EMA9={signals['ema_fast']} EMA21={signals['ema_slow']} | RSI={signals['rsi']} | BUY={signals['buy']} SELL={signals['sell']}")
+            log.info(f"  {symbol} | {signals['close']} | RSI={signals['rsi']} | Vol={signals['vol_spike']} | BUY={signals['buy']} SELL={signals['sell']}")
             if signals["buy"]:
                 self._open_trade(symbol, balance, "LONG", signals)
                 found = True; break
@@ -289,7 +300,7 @@ class EMAScalpBot:
         price    = get_futures_price(self.client, symbol)
         lot      = get_lot_size(self.client, symbol)
         atr      = signals["atr"]
-        stop_dist = max(atr * ATR_STOP_MULT / price, 0.005)
+        stop_dist = max(atr * ATR_STOP_MULT / price, 0.004)
         stop     = price * (1 - stop_dist) if side == "LONG" else price * (1 + stop_dist)
         target   = price * (1 + stop_dist * REWARD_RISK) if side == "LONG" else price * (1 - stop_dist * REWARD_RISK)
         capital  = balance * RISK_PER_TRADE
@@ -315,7 +326,7 @@ class EMAScalpBot:
                 "entry": entry, "stop": round(stop, 8), "target": round(target, 8),
                 "order_id": order["orderId"], "opened_at": time.time()
             }
-            log.info(f"{'LONG' if side=='LONG' else 'SHORT'} {symbol} | qty={qty} | entrada={entry:.4f} | stop={stop:.4f} ({stop_dist*100:.2f}%) | target={target:.4f} ({stop_dist*REWARD_RISK*100:.2f}%) | {capital:.2f}x{LEVERAGE}")
+            log.info(f"{'LONG' if side=='LONG' else 'SHORT'} {symbol} | qty={qty} | entrada={entry:.4f} | stop={stop:.4f} ({stop_dist*100:.2f}%) | target={target:.4f} | {capital:.2f}x{LEVERAGE}")
         except BinanceAPIException as e:
             log.error(f"Erro ao abrir: {e}")
 
@@ -339,4 +350,4 @@ class EMAScalpBot:
 if __name__ == "__main__":
     if not API_KEY or not API_SECRET:
         log.error("Configure BINANCE_API_KEY e BINANCE_API_SECRET."); exit(1)
-    EMAScalpBot().run()
+    AggressiveScalpBot().run()
