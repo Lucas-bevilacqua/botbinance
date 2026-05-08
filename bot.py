@@ -24,12 +24,12 @@ EMA_FAST       = 5
 EMA_SLOW       = 13
 EMA_TREND      = 50
 RSI_PERIOD     = 7
-RSI_MIN        = 35
-RSI_MAX        = 65
+RSI_MIN        = 45
+RSI_MAX        = 55
 ATR_PERIOD     = 7
-ATR_STOP_MULT  = 1.0
+ATR_STOP_MULT  = 1.2
 VOL_MA_PERIOD  = 20
-VOL_SPIKE_MULT = 1.2
+VOL_SPIKE_MULT = 1.5
 LEVERAGE       = 10
 RISK_PER_TRADE = 0.05
 REWARD_RISK    = 2.0
@@ -179,9 +179,13 @@ def get_signals(df):
     above_trend = last_close > last_trend
     below_trend = last_close < last_trend
 
+    # Filtro de momentum: preco deve estar se afastando da EMA50, nao lateralizando
+    ema_dist_pct = abs(last_close - last_trend) / last_trend
+    momentum_ok  = ema_dist_pct > 0.003  # pelo menos 0.3% de distancia da EMA50
+
     return {
-        "buy":        bull_cross and above_trend and rsi_ok and vol_spike,
-        "sell":       bear_cross and below_trend and rsi_ok and vol_spike,
+        "buy":        bull_cross and above_trend and rsi_ok and vol_spike and momentum_ok,
+        "sell":       bear_cross and below_trend and rsi_ok and vol_spike and momentum_ok,
         "exit_long":  cross_dn_now,
         "exit_short": cross_up_now,
         "rsi":        round(last_rsi, 2),
