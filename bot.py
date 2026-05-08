@@ -507,7 +507,7 @@ def api_stats():
 def health():
     return jsonify({"status": "ok", "ts": datetime.utcnow().isoformat()})
 
-@app.route('/api/reset', methods=['POST'])
+@app.route('/api/reset')
 def reset_db():
     try:
         conn = sqlite3.connect(DB_PATH)
