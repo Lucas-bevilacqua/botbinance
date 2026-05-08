@@ -19,7 +19,7 @@ import numpy as np
 # CONFIG
 API_KEY        = os.getenv("BINANCE_API_KEY", "")
 API_SECRET     = os.getenv("BINANCE_API_SECRET", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
 
 EMA_FAST       = 5
 EMA_SLOW       = 13
@@ -158,36 +158,7 @@ def set_leverage(client, symbol, leverage):
     except BinanceAPIException:
         pass
 
-def ask_gemini(symbol, side, signals, candles):
-    if not GEMINI_API_KEY:
-        return True
-    recent = candles[-5:]
-    candle_summary = " | ".join([f"c={float(c[4]):.4f} v={float(c[5]):.0f}" for c in recent])
-    prompt = f"""Voce e um scalper agressivo de futuros de criptomoedas em 1min.
-Par: {symbol} | Direcao: {side}
-EMA5={signals['ema_fast']} EMA13={signals['ema_slow']} EMA50={signals['ema_trend']}
-RSI(7): {signals['rsi']} | ATR: {signals['atr']} | Volume spike: {signals['vol_spike']}
-Preco: {signals['close']}
-Ultimos 5 candles (close | volume): {candle_summary}
 
-Devo entrar em {side} agora?
-Responda APENAS: CONFIRMAR ou BLOQUEAR: [motivo curto]"""
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        resp = requests.post(url, json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 60}
-        }, timeout=8)
-        data = resp.json()
-        if "candidates" not in data:
-            log.warning(f"Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo.")
-            return True
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        log.info(f"Gemini [{symbol}]: {text}")
-        return text.upper().startswith("CONFIRMAR")
-    except Exception as e:
-        log.warning(f"Gemini indisponivel: {e}. Prosseguindo.")
-        return True
 
 def rank_pairs(client):
     tickers = {t["symbol"]: t for t in client.futures_ticker()}
@@ -307,11 +278,6 @@ class AggressiveScalpBot:
         qty      = round_step((capital * LEVERAGE) / price, lot["step_size"])
         if qty < lot["min_qty"]:
             log.warning(f"Qty {qty} abaixo do minimo {lot['min_qty']}"); return
-
-        raw_candles = get_klines(self.client, symbol).values.tolist()
-        if not ask_gemini(symbol, side, signals, raw_candles):
-            log.info(f"Gemini bloqueou {side} {symbol}.")
-            return
 
         try:
             order = self.client.futures_create_order(
