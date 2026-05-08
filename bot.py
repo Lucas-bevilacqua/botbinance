@@ -250,378 +250,236 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>⚡ ScalpBot</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScalpBot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #07090c;
-    --surface: #0e1318;
-    --surface2: #131920;
-    --border: #1c2530;
-    --green: #0df5a0;
-    --red: #ff2d55;
-    --yellow: #ffd60a;
-    --blue: #3b9eff;
-    --purple: #bf5af2;
-    --text: #dce8f5;
-    --muted: #3d5166;
-    --font: 'JetBrains Mono', monospace;
-    --display: 'Syne', sans-serif;
-    --radius: 14px;
-    --pad: 16px;
-  }
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html { font-size: 14px; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font);
-    min-height: 100vh;
-    padding: 16px;
-    padding-bottom: 32px;
-    overflow-x: hidden;
-  }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0c10;--card:#111318;--border:#1e2530;
+  --green:#00e676;--red:#ff1744;--yellow:#ffd600;--blue:#2979ff;--purple:#d500f9;
+  --text:#e8edf2;--sub:#4a5568;
+}
+html,body{width:100%;min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:12px}
 
-  /* ── Header ── */
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 0 16px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
-    gap: 8px;
-  }
-  .logo {
-    font-family: var(--display);
-    font-size: clamp(20px, 5vw, 26px);
-    font-weight: 800;
-    letter-spacing: -1px;
-    white-space: nowrap;
-  }
-  .logo span { color: var(--green); }
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--muted);
-    flex-shrink: 0;
-  }
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--green);
-    animation: blink 1.8s ease-in-out infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+/* HEADER */
+.hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 0 14px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.hdr-title{font-size:18px;font-weight:700;letter-spacing:-.5px}
+.hdr-title b{color:var(--green)}
+.hdr-live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-  /* ── Cards grid ── */
-  .cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--pad);
-    position: relative;
-    overflow: hidden;
-  }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    border-radius: var(--radius) var(--radius) 0 0;
-  }
-  .card.blue::before { background: var(--blue); }
-  .card.green::before { background: var(--green); }
-  .card.yellow::before { background: var(--yellow); }
-  .card.purple::before { background: var(--purple); }
-  .card-label {
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 6px;
-  }
-  .card-val {
-    font-family: var(--display);
-    font-size: clamp(20px, 6vw, 28px);
-    font-weight: 800;
-    line-height: 1;
-  }
-  .card-val.blue { color: var(--blue); }
-  .card-val.green { color: var(--green); }
-  .card-val.yellow { color: var(--yellow); }
-  .card-val.purple { color: var(--purple); }
-  .card-val.red { color: var(--red); }
+/* CARDS 2x2 mobile */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 12px}
+.card-top{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.card-num{font-size:22px;font-weight:700;line-height:1}
+.c-blue .card-num{color:var(--blue)}
+.c-yellow .card-num{color:var(--yellow)}
+.c-purple .card-num{color:var(--purple)}
+.c-green .card-num{color:var(--green)}
+.c-red .card-num{color:var(--red)}
 
-  /* ── Section title ── */
-  .sec {
-    font-family: var(--display);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 10px;
-    margin-top: 20px;
-  }
+/* SECTION */
+.sec{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--sub);margin:16px 0 8px}
 
-  /* ── Chart boxes ── */
-  .chart-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    position: relative;
-  }
-  .chart-wrap { position: relative; height: 110px; }
+/* CHART */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:0}
+.chart-inner{position:relative;width:100%;height:100px}
+.chart-inner canvas{display:block;width:100%!important;height:100%!important}
 
-  /* ── Resumo row ── */
-  .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 0;
-  }
-  .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .info-table td { padding: 8px 4px; border-bottom: 1px solid var(--border); }
-  .info-table td:first-child { color: var(--muted); }
-  .info-table td:last-child { text-align: right; font-weight: 700; }
-  .info-table tr:last-child td { border-bottom: none; }
+/* INFO ROW - stacked no mobile */
+.info-row{display:flex;flex-direction:column;gap:8px}
+.info-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+.info-line{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.info-line:last-child{border-bottom:none}
+.info-line span:first-child{color:var(--sub)}
+.info-line span:last-child{font-weight:600}
 
-  /* ── Trades list (mobile-first cards) ── */
-  .trade-list { display: flex; flex-direction: column; gap: 8px; }
-  .trade-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 10px;
-  }
-  .trade-card:active { background: var(--surface2); }
-  .trade-sym { font-family: var(--display); font-size: 13px; font-weight: 700; }
-  .trade-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .trade-pnl { text-align: right; }
-  .trade-pnl-pct { font-family: var(--display); font-size: 15px; font-weight: 800; }
-  .trade-pnl-usd { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .pos { color: var(--green); }
-  .neg { color: var(--red); }
+/* TRADE CARDS */
+.trades{display:flex;flex-direction:column;gap:6px}
+.tc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.tc-left{}
+.tc-sym{font-size:14px;font-weight:700;margin-top:4px}
+.tc-meta{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.5}
+.tc-right{text-align:right;min-width:60px}
+.tc-pct{font-size:15px;font-weight:700}
+.tc-usd{font-size:11px;color:var(--sub);margin-top:1px}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
 
-  /* ── Badge ── */
-  .badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .5px;
-  }
-  .b-long  { background: rgba(13,245,160,.12); color: var(--green); }
-  .b-short { background: rgba(255,45,85,.12);  color: var(--red); }
-  .b-ok    { background: rgba(13,245,160,.12); color: var(--green); }
-  .b-stop  { background: rgba(255,45,85,.12);  color: var(--red); }
-  .b-time  { background: rgba(59,158,255,.12); color: var(--blue); }
+/* BADGE */
+.b{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700}
+.b-long{background:rgba(0,230,118,.12);color:var(--green)}
+.b-short{background:rgba(255,23,68,.12);color:var(--red)}
+.b-ok{background:rgba(0,230,118,.12);color:var(--green)}
+.b-stop{background:rgba(255,23,68,.12);color:var(--red)}
+.b-time{background:rgba(41,121,255,.12);color:var(--blue)}
 
-  .empty { color: var(--muted); text-align: center; padding: 28px; font-size: 12px; }
+.empty{text-align:center;padding:24px;color:var(--sub);font-size:12px}
 
-  /* ── Tablet / Desktop ── */
-  @media (min-width: 640px) {
-    body { padding: 24px; max-width: 900px; margin: 0 auto; }
-    .cards { grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .chart-wrap { height: 130px; }
-    .info-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
-    .trade-card { grid-template-columns: 56px 1fr 80px 80px auto; }
-  }
-  @media (min-width: 900px) {
-    .cards { gap: 16px; }
-  }
+/* DESKTOP */
+@media(min-width:600px){
+  body{padding:20px;max-width:800px;margin:0 auto}
+  .cards{grid-template-columns:repeat(4,1fr);gap:12px}
+  .chart-inner{height:130px}
+  .info-row{flex-direction:row}
+  .info-card{flex:1}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">⚡ Scalp<span>Bot</span></div>
-  <div class="status">
-    <span class="dot"></span>
-    <span id="ts">--</span>
-  </div>
-</header>
+<div class="hdr">
+  <div class="hdr-title">⚡ Scalp<b>Bot</b></div>
+  <div class="hdr-live"><span class="dot"></span><span id="ts">--</span></div>
+</div>
 
-<!-- Cards -->
 <div class="cards">
-  <div class="card blue">
-    <div class="card-label">Saldo</div>
-    <div class="card-val blue" id="balance">--</div>
+  <div class="card c-blue">
+    <div class="card-top">Saldo</div>
+    <div class="card-num" id="balance">--</div>
   </div>
-  <div class="card green">
-    <div class="card-label">PnL Total</div>
-    <div class="card-val" id="total-pnl">--</div>
+  <div class="card">
+    <div class="card-top">PnL Total</div>
+    <div class="card-num" id="pnl">--</div>
   </div>
-  <div class="card yellow">
-    <div class="card-label">Win Rate</div>
-    <div class="card-val yellow" id="win-rate">--</div>
+  <div class="card c-yellow">
+    <div class="card-top">Win Rate</div>
+    <div class="card-num" id="wr">--</div>
   </div>
-  <div class="card purple">
-    <div class="card-label">Trades</div>
-    <div class="card-val purple" id="total-trades">--</div>
+  <div class="card c-purple">
+    <div class="card-top">Trades</div>
+    <div class="card-num" id="tot">--</div>
   </div>
 </div>
 
-<!-- Gráfico saldo -->
-<div class="sec">Saldo ao longo do tempo</div>
-<div class="chart-box">
-  <div class="chart-wrap"><canvas id="balChart"></canvas></div>
+<div class="sec">Saldo</div>
+<div class="chart-card">
+  <div class="chart-inner"><canvas id="balChart"></canvas></div>
 </div>
 
-<!-- Resumo + PnL chart -->
 <div class="sec">Resumo</div>
-<div class="info-grid">
-  <div class="chart-box">
-    <table class="info-table">
-      <tr><td>Wins</td><td class="pos" id="wins">--</td></tr>
-      <tr><td>Losses</td><td class="neg" id="losses">--</td></tr>
-      <tr><td>Estratégia</td><td style="color:var(--yellow)">EMA 5/13</td></tr>
-      <tr><td>Timeframe</td><td>1 min</td></tr>
-      <tr><td>Alavancagem</td><td>10x</td></tr>
-      <tr><td>Risco</td><td>5% / trade</td></tr>
-    </table>
+<div class="info-row">
+  <div class="info-card">
+    <div class="info-line"><span>Wins</span><span class="pos" id="wins">--</span></div>
+    <div class="info-line"><span>Losses</span><span class="neg" id="losses">--</span></div>
+    <div class="info-line"><span>Estratégia</span><span style="color:var(--yellow)">EMA 5/13</span></div>
+    <div class="info-line"><span>Timeframe</span><span>1 min</span></div>
+    <div class="info-line"><span>Alavancagem</span><span>10x</span></div>
+    <div class="info-line"><span>Risco/trade</span><span>5%</span></div>
   </div>
-  <div class="chart-box">
-    <div class="chart-wrap"><canvas id="pnlChart"></canvas></div>
+  <div class="info-card">
+    <div class="chart-inner"><canvas id="pnlChart"></canvas></div>
   </div>
 </div>
 
-<!-- Trades -->
 <div class="sec">Últimos trades</div>
-<div class="trade-list" id="trades-list">
+<div class="trades" id="trades-list">
   <div class="empty">Carregando...</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-const C = {
-  bg:'#07090c', surface:'#0e1318', border:'#1c2530',
-  green:'#0df5a0', red:'#ff2d55', blue:'#3b9eff',
-  muted:'#3d5166', text:'#dce8f5'
-};
-const fontMono = { family:'JetBrains Mono', size:10 };
+const G={green:'#00e676',red:'#ff1744',blue:'#2979ff',sub:'#4a5568',border:'#1e2530',card:'#111318'};
+let BC,PC;
 
-let balChart, pnlChart;
-
-function mk(id, type, color, fill=false) {
-  return new Chart(document.getElementById(id).getContext('2d'), {
+function mkChart(id,type,color,fill){
+  const ctx=document.getElementById(id);
+  if(!ctx)return null;
+  return new Chart(ctx,{
     type,
-    data: { labels:[], datasets:[{
-      data:[], borderColor:color,
-      backgroundColor: fill ? color.replace(')',',0.12)').replace('rgb','rgba') : color+'33',
-      borderWidth:2, pointRadius:0, fill, tension:.4, borderRadius:4
-    }]},
+    data:{labels:[],datasets:[{data:[],borderColor:color,
+      backgroundColor:fill?color+'22':color+'44',
+      borderWidth:2,pointRadius:0,fill:!!fill,tension:.4,borderRadius:3}]},
     options:{
-      responsive:true, maintainAspectRatio:false,
-      animation:false,
-      plugins:{ legend:{display:false}, tooltip:{
-        backgroundColor:'#131920', titleColor:C.text, bodyColor:C.muted,
-        borderColor:C.border, borderWidth:1,
-        callbacks:{ label: ctx => ' $'+Number(ctx.raw).toFixed(2) }
-      }},
+      responsive:false,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:G.card,
+        titleColor:'#e8edf2',bodyColor:G.sub,borderColor:G.border,borderWidth:1}},
       scales:{
-        x:{ display:false },
-        y:{ ticks:{ color:C.muted, font:fontMono, maxTicksLimit:4 }, grid:{ color:C.border } }
+        x:{display:false},
+        y:{ticks:{color:G.sub,font:{size:10},maxTicksLimit:3},grid:{color:G.border},border:{display:false}}
       }
     }
   });
 }
 
-function initCharts() {
-  balChart = mk('balChart','line', C.blue, true);
-  pnlChart = mk('pnlChart','bar',  C.green);
+function resizeCharts(){
+  ['balChart','pnlChart'].forEach(id=>{
+    const c=document.getElementById(id);
+    if(c&&c.parentElement){
+      c.width=c.parentElement.offsetWidth;
+      c.height=c.parentElement.offsetHeight;
+    }
+  });
+  if(BC)BC.resize();
+  if(PC)PC.resize();
 }
 
-function badgeSide(s) {
-  return `<span class="badge b-${s.toLowerCase()}">${s}</span>`;
-}
-function badgeReason(r) {
-  const cls = r==='STOP' ? 'b-stop' : r==='TIMEOUT' ? 'b-time' : 'b-ok';
-  return `<span class="badge ${cls}">${r}</span>`;
+function badgeSide(s){return`<span class="b b-${s.toLowerCase()}">${s}</span>`}
+function badgeReason(r){
+  const m={STOP:'b-stop',TIMEOUT:'b-time'};
+  return`<span class="b ${m[r]||'b-ok'}">${r}</span>`;
 }
 
-async function refresh() {
-  try {
-    const r = await fetch('/api/stats');
-    const d = await r.json();
-    const s = d.stats || {};
+async function refresh(){
+  try{
+    const r=await fetch('/api/stats');
+    const d=await r.json();
+    const s=d.stats||{};
 
-    const bal = d.balance_history?.length
-      ? d.balance_history[d.balance_history.length-1].balance : 0;
+    const bal=d.balance_history?.length?d.balance_history[d.balance_history.length-1].balance:0;
+    document.getElementById('balance').textContent='$'+bal.toFixed(2);
 
-    document.getElementById('balance').textContent = '$'+bal.toFixed(2);
+    const pnl=s.total_pnl||0;
+    const pe=document.getElementById('pnl');
+    pe.textContent=(pnl>=0?'+':'')+'$'+Math.abs(pnl).toFixed(4);
+    pe.className='card-num '+(pnl>=0?'c-green':'c-red');
 
-    const pnl = s.total_pnl || 0;
-    const pnlEl = document.getElementById('total-pnl');
-    pnlEl.textContent = (pnl>=0?'+':'')+'$'+Math.abs(pnl).toFixed(4);
-    pnlEl.className = 'card-val '+(pnl>=0?'green':'red');
+    document.getElementById('wr').textContent=(s.win_rate||0)+'%';
+    document.getElementById('tot').textContent=s.total_trades||0;
+    document.getElementById('wins').textContent=s.wins||0;
+    document.getElementById('losses').textContent=s.losses||0;
 
-    document.getElementById('win-rate').textContent = (s.win_rate||0)+'%';
-    document.getElementById('total-trades').textContent = s.total_trades||0;
-    document.getElementById('wins').textContent = s.wins||0;
-    document.getElementById('losses').textContent = s.losses||0;
+    const bh=d.balance_history||[];
+    if(BC){BC.data.labels=bh.map(b=>b.ts.slice(11,16));BC.data.datasets[0].data=bh.map(b=>b.balance);BC.update('none');}
 
-    // Balance chart
-    const bh = d.balance_history || [];
-    balChart.data.labels = bh.map(b=>b.ts.slice(11,16));
-    balChart.data.datasets[0].data = bh.map(b=>b.balance);
-    balChart.update('none');
+    const tr=(d.trades||[]).slice().reverse();
+    if(PC){PC.data.labels=tr.map(t=>t.symbol.replace('USDT',''));PC.data.datasets[0].data=tr.map(t=>t.pnl);
+      PC.data.datasets[0].backgroundColor=tr.map(t=>t.pnl>=0?G.green+'88':G.red+'88');PC.update('none');}
 
-    // PnL chart
-    const ts = (d.trades||[]).slice().reverse();
-    pnlChart.data.labels = ts.map(t=>t.symbol.replace('USDT',''));
-    pnlChart.data.datasets[0].data = ts.map(t=>t.pnl);
-    pnlChart.data.datasets[0].backgroundColor = ts.map(t=>t.pnl>=0?C.green+'99':C.red+'99');
-    pnlChart.update('none');
-
-    // Trades list
-    const el = document.getElementById('trades-list');
-    if (!d.trades?.length) {
-      el.innerHTML = '<div class="empty">Nenhum trade ainda</div>';
-    } else {
-      el.innerHTML = d.trades.map(t => {
-        const ppos = t.pnl_pct >= 0;
-        const p$ = t.pnl >= 0;
-        return `<div class="trade-card">
-          <div>
-            ${badgeSide(t.side)}
-            <div class="trade-sym" style="margin-top:4px">${t.symbol.replace('USDT','')}</div>
+    const el=document.getElementById('trades-list');
+    if(!d.trades?.length){el.innerHTML='<div class="empty">Nenhum trade ainda</div>';}
+    else{
+      el.innerHTML=d.trades.map(t=>{
+        const pp=t.pnl_pct>=0,p$=t.pnl>=0;
+        return`<div class="tc">
+          <div><div>${badgeSide(t.side)}</div><div class="tc-sym">${t.symbol.replace('USDT','')}</div></div>
+          <div class="tc-meta">
+            ${t.opened_at?t.opened_at.slice(11,16):'--'} · ${t.duration}s · ${badgeReason(t.reason)}<br>
+            ${t.entry?.toFixed(4)||'--'} → ${t.exit?.toFixed(4)||'--'}
           </div>
-          <div>
-            <div class="trade-meta">${t.opened_at ? t.opened_at.slice(11,16) : '--'} &bull; ${t.duration}s &bull; ${badgeReason(t.reason)}</div>
-            <div class="trade-meta" style="margin-top:3px">entr: ${t.entry?.toFixed(4)} &rarr; ${t.exit?.toFixed(4)||'--'}</div>
-          </div>
-          <div class="trade-pnl">
-            <div class="trade-pnl-pct ${ppos?'pos':'neg'}">${ppos?'+':''}${(t.pnl_pct||0).toFixed(2)}%</div>
-            <div class="trade-pnl-usd ${p$?'pos':'neg'}">${p$?'+':''}$${Math.abs(t.pnl||0).toFixed(4)}</div>
+          <div class="tc-right">
+            <div class="tc-pct ${pp?'pos':'neg'}">${pp?'+':''}${(t.pnl_pct||0).toFixed(2)}%</div>
+            <div class="tc-usd ${p$?'pos':'neg'}">${p$?'+':''}$${Math.abs(t.pnl||0).toFixed(4)}</div>
           </div>
         </div>`;
       }).join('');
     }
-
-    document.getElementById('ts').textContent = new Date().toLocaleTimeString('pt-BR');
-  } catch(e) { console.error(e); }
+    document.getElementById('ts').textContent=new Date().toLocaleTimeString('pt-BR');
+  }catch(e){console.error(e)}
 }
 
-initCharts();
-refresh();
-setInterval(refresh, 10000);
+window.addEventListener('load',()=>{
+  resizeCharts();
+  BC=mkChart('balChart','line',G.blue,true);
+  PC=mkChart('pnlChart','bar',G.green,false);
+  refresh();
+  setInterval(refresh,10000);
+});
+window.addEventListener('resize',resizeCharts);
 </script>
 </body>
 </html>"""
