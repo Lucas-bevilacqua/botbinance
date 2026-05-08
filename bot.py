@@ -205,7 +205,11 @@ CONFIRMAR ou BLOQUEAR: [motivo curto em português]"""
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.1, "maxOutputTokens": 60}
         }, timeout=8)
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        data = resp.json()
+        if "candidates" not in data:
+            log.warning(f"⚠️  Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo sem filtro.")
+            return True
+        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         log.info(f"🤖 Gemini [{symbol}]: {text}")
         return text.upper().startswith("CONFIRMAR")
     except Exception as e:
