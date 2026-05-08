@@ -1,21 +1,9 @@
 """
-🤖 Binance Futures Scalping Bot
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Estratégia: SuperTrend (ATR 7, mult 2) + RSI(9) + EMA200
-Metodologia: Trend-following com filtro de momentum
-Backtests documentados: 55-70% win rate, profit factor ~1.8
-Timeframe: 3m (scalping) | Alavancagem: 10x
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-REGRAS DE ENTRADA:
-  LONG:  SuperTrend verde (flip) + preço > EMA200 + RSI entre 40-60
-  SHORT: SuperTrend vermelho (flip) + preço < EMA200 + RSI entre 40-60
-
-REGRAS DE SAÍDA:
-  - Stop loss: linha do SuperTrend (dinâmico)
-  - Take profit: 2x o risco (ratio 2:1)
-  - Timeout: 10 minutos sem atingir alvo
-  - Sinal contrário: SuperTrend flipa na direção oposta
+Binance Futures Scalping Bot
+Estrategia: EMA Cross (9/21) + RSI(14) + EMA200
+LONG:  EMA9 cruza acima EMA21 + preco > EMA200 + RSI 45-65
+SHORT: EMA9 cruza abaixo EMA21 + preco < EMA200 + RSI 35-55
+Stop: 1.5x ATR | Target: 2x risco | Timeout: 10min
 """
 
 import os
@@ -27,29 +15,26 @@ from binance.exceptions import BinanceAPIException
 import pandas as pd
 import numpy as np
 
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
-API_KEY    = os.getenv("BINANCE_API_KEY", "")
-API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+# CONFIG
+API_KEY        = os.getenv("BINANCE_API_KEY", "")
+API_SECRET     = os.getenv("BINANCE_API_SECRET", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-SUPERTREND_ATR_PERIOD  = 7
-SUPERTREND_MULTIPLIER  = 2.0
-RSI_PERIOD             = 9
-RSI_MIN                = 40
-RSI_MAX                = 60
-EMA_TREND_PERIOD       = 200
-LEVERAGE               = 10
-RISK_PER_TRADE         = 0.05
-REWARD_RISK_RATIO      = 2.0
-MAX_TRADE_DURATION     = 600
-SCAN_INTERVAL_SEC      = 20
+EMA_FAST         = 9
+EMA_SLOW         = 21
+EMA_TREND        = 200
+RSI_PERIOD       = 14
+ATR_PERIOD       = 14
+ATR_STOP_MULT    = 1.5
+LEVERAGE         = 10
+RISK_PER_TRADE   = 0.05
+REWARD_RISK      = 2.0
+MAX_DURATION     = 600
+SCAN_INTERVAL    = 20
 
 CANDIDATE_PAIRS = [
-    # Tier 1 — alta liquidez
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    # Tier 2 — médio cap, mais voláteis
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-    # Tier 3 — altcoins com bom volume
     "LTCUSDT", "UNIUSDT", "ATOMUSDT", "NEARUSDT", "APTUSDT",
     "ARBUSDT", "OPUSDT", "INJUSDT", "SUIUSDT", "TIAUSDT"
 ]
@@ -61,40 +46,10 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ─── INDICADORES ──────────────────────────────────────────────────────────────
+# INDICADORES
 
-def calc_atr(df, period):
-    high, low, close = df["high"], df["low"], df["close"]
-    tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
-    return tr.ewm(alpha=1/period, adjust=False).mean()
-
-def calc_supertrend(df, atr_period, multiplier):
-    hl2  = (df["high"] + df["low"]) / 2
-    atr  = calc_atr(df, atr_period)
-    upper_band = hl2 + multiplier * atr
-    lower_band = hl2 - multiplier * atr
-    supertrend = [np.nan] * len(df)
-    direction  = [0] * len(df)
-    for i in range(1, len(df)):
-        cp = df["close"].iloc[i-1]
-        cc = df["close"].iloc[i]
-        ub = upper_band.iloc[i] if (upper_band.iloc[i-1] < upper_band.iloc[i] or cp > upper_band.iloc[i-1]) else min(upper_band.iloc[i], upper_band.iloc[i-1])
-        lb = lower_band.iloc[i] if (lower_band.iloc[i-1] > lower_band.iloc[i] or cp < lower_band.iloc[i-1]) else max(lower_band.iloc[i], lower_band.iloc[i-1])
-        prev_st = supertrend[i-1] if not np.isnan(supertrend[i-1]) else ub
-        if prev_st == upper_band.iloc[i-1]:
-            if cc <= ub:
-                supertrend[i] = ub; direction[i] = -1
-            else:
-                supertrend[i] = lb; direction[i] = 1
-        else:
-            if cc >= lb:
-                supertrend[i] = lb; direction[i] = 1
-            else:
-                supertrend[i] = ub; direction[i] = -1
-    df = df.copy()
-    df["supertrend"] = supertrend
-    df["st_dir"] = direction
-    return df
+def calc_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
 
 def calc_rsi(series, period):
     delta = series.diff()
@@ -103,42 +58,63 @@ def calc_rsi(series, period):
     rs    = gain / loss.replace(0, np.nan)
     return 100 - (100 / (1 + rs))
 
-def calc_ema(series, period):
-    return series.ewm(span=period, adjust=False).mean()
+def calc_atr(df, period):
+    high, low, close = df["high"], df["low"], df["close"]
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+    return tr.ewm(alpha=1/period, adjust=False).mean()
 
 def get_signals(df):
-    df_st   = calc_supertrend(df, SUPERTREND_ATR_PERIOD, SUPERTREND_MULTIPLIER)
-    close   = df["close"]
-    rsi     = calc_rsi(close, RSI_PERIOD)
-    ema200  = calc_ema(close, EMA_TREND_PERIOD)
-    curr_dir  = df_st["st_dir"].iloc[-1]
-    prev_dir  = df_st["st_dir"].iloc[-2]
-    curr_st   = df_st["supertrend"].iloc[-1]
-    last_rsi  = rsi.iloc[-1]
-    last_ema  = ema200.iloc[-1]
-    last_close= close.iloc[-1]
-    bull_signal = curr_dir == 1   # ST verde (não precisa de flip)
-    bear_signal = curr_dir == -1  # ST vermelho (não precisa de flip)
-    above_ema = last_close > last_ema
-    below_ema = last_close < last_ema
-    rsi_ok    = RSI_MIN <= last_rsi <= RSI_MAX
+    close    = df["close"]
+    ema_fast = calc_ema(close, EMA_FAST)
+    ema_slow = calc_ema(close, EMA_SLOW)
+    ema_trend= calc_ema(close, EMA_TREND)
+    rsi      = calc_rsi(close, RSI_PERIOD)
+    atr      = calc_atr(df, ATR_PERIOD)
+
+    # Cruzamento atual e anterior
+    cross_up_now  = ema_fast.iloc[-1] > ema_slow.iloc[-1]
+    cross_up_prev = ema_fast.iloc[-2] > ema_slow.iloc[-2]
+    cross_dn_now  = ema_fast.iloc[-1] < ema_slow.iloc[-1]
+    cross_dn_prev = ema_fast.iloc[-2] < ema_slow.iloc[-2]
+
+    # Sinal de entrada: momento do cruzamento
+    bull_cross = cross_up_now and not cross_up_prev
+    bear_cross = cross_dn_now and not cross_dn_prev
+
+    last_close = close.iloc[-1]
+    last_ema_t = ema_trend.iloc[-1]
+    last_rsi   = rsi.iloc[-1]
+    last_atr   = atr.iloc[-1]
+
+    above_trend = last_close > last_ema_t
+    below_trend = last_close < last_ema_t
+
+    rsi_long  = 45 <= last_rsi <= 65
+    rsi_short = 35 <= last_rsi <= 55
+
     return {
-        "buy":        bull_signal and above_ema and rsi_ok,
-        "sell":       bear_signal and below_ema and rsi_ok,
-        "exit_long":  curr_dir == -1,
-        "exit_short": curr_dir == 1,
+        "buy":        bull_cross and above_trend and rsi_long,
+        "sell":       bear_cross and below_trend and rsi_short,
+        "exit_long":  cross_dn_now,
+        "exit_short": cross_up_now,
         "rsi":        round(last_rsi, 2),
-        "st_dir":     curr_dir,
-        "st_line":    round(curr_st, 6) if not np.isnan(curr_st) else 0,
-        "ema200":     round(last_ema, 6),
+        "ema_fast":   round(ema_fast.iloc[-1], 6),
+        "ema_slow":   round(ema_slow.iloc[-1], 6),
+        "ema_trend":  round(last_ema_t, 6),
+        "atr":        round(last_atr, 6),
         "close":      round(last_close, 6),
     }
 
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
+# HELPERS
 
 def get_klines(client, symbol, interval="3m", limit=250):
     raw = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
-    df  = pd.DataFrame(raw, columns=["time","open","high","low","close","volume","close_time","qa_vol","trades","taker_buy","taker_buy_qa","ignore"])
+    df  = pd.DataFrame(raw, columns=["time","open","high","low","close","volume",
+                                      "close_time","qa_vol","trades","taker_buy","taker_buy_qa","ignore"])
     for col in ["open","high","low","close","volume"]:
         df[col] = df[col].astype(float)
     return df.reset_index(drop=True)
@@ -172,33 +148,19 @@ def set_leverage(client, symbol, leverage):
     except BinanceAPIException:
         pass
 
-
-def ask_gemini(symbol: str, side: str, signals: dict, candles: list) -> bool:
-    """
-    Consulta o Gemini Flash para confirmar ou bloquear a entrada.
-    Retorna True se confirmado, False se bloqueado.
-    """
+def ask_gemini(symbol, side, signals, candles):
     if not GEMINI_API_KEY:
-        return True  # Se não tiver chave, não filtra
-
-    # Monta contexto dos últimos 5 candles
+        return True
     recent = candles[-5:]
-    candle_summary = " | ".join([
-        f"c={float(c[4]):.4f} v={float(c[5]):.0f}"
-        for c in recent
-    ])
+    candle_summary = " | ".join([f"c={float(c[4]):.4f} v={float(c[5]):.0f}" for c in recent])
+    prompt = f"""Voce e um analista de futuros de criptomoedas.
+Par: {symbol} | Direcao: {side}
+EMA9={signals['ema_fast']} EMA21={signals['ema_slow']} EMA200={signals['ema_trend']}
+RSI(14): {signals['rsi']} | ATR: {signals['atr']} | Preco: {signals['close']}
+Ultimos 5 candles (close | volume): {candle_summary}
 
-    prompt = f"""Você é um analista de futuros de criptomoedas.
-Par: {symbol} | Direção: {side}
-SuperTrend: {"VERDE (bullish)" if signals["st_dir"] == 1 else "VERMELHO (bearish)"}
-RSI({RSI_PERIOD}): {signals["rsi"]}
-EMA200: {signals["ema200"]} | Preço atual: {signals["close"]}
-Últimos 5 candles (close | volume): {candle_summary}
-
-Com base nesses dados, devo entrar em {side} agora?
-Responda APENAS com uma linha no formato:
-CONFIRMAR ou BLOQUEAR: [motivo curto em português]"""
-
+Devo entrar em {side} agora?
+Responda APENAS: CONFIRMAR ou BLOQUEAR: [motivo curto]"""
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
         resp = requests.post(url, json={
@@ -207,17 +169,16 @@ CONFIRMAR ou BLOQUEAR: [motivo curto em português]"""
         }, timeout=8)
         data = resp.json()
         if "candidates" not in data:
-            log.warning(f"⚠️  Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo sem filtro.")
+            log.warning(f"Gemini erro: {data.get('error', {}).get('message', str(data))}. Prosseguindo sem filtro.")
             return True
         text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        log.info(f"🤖 Gemini [{symbol}]: {text}")
+        log.info(f"Gemini [{symbol}]: {text}")
         return text.upper().startswith("CONFIRMAR")
     except Exception as e:
-        log.warning(f"⚠️  Gemini indisponível: {e}. Prosseguindo sem filtro.")
+        log.warning(f"Gemini indisponivel: {e}. Prosseguindo sem filtro.")
         return True
 
 def rank_pairs(client):
-    """Retorna todos os pares ordenados por volume x momentum."""
     tickers = {t["symbol"]: t for t in client.futures_ticker()}
     scores  = {}
     for symbol in CANDIDATE_PAIRS:
@@ -229,48 +190,44 @@ def rank_pairs(client):
         scores[symbol] = volume * change
     return sorted(scores, key=scores.get, reverse=True)
 
-# ─── BOT ──────────────────────────────────────────────────────────────────────
+# BOT
 
-class SuperTrendScalpBot:
+class EMAScalpBot:
     def __init__(self):
         self.client     = Client(API_KEY, API_SECRET)
         self.open_trade = None
-        log.info("✅ Bot conectado à Binance Futures")
-        log.info(f"📐 SuperTrend(ATR={SUPERTREND_ATR_PERIOD}, mult={SUPERTREND_MULTIPLIER}) + RSI({RSI_PERIOD}) + EMA{EMA_TREND_PERIOD}")
-        log.info(f"⚙️  Alavancagem: {LEVERAGE}x | Risco: {RISK_PER_TRADE*100:.0f}%/trade | R:R=1:{REWARD_RISK_RATIO}")
+        log.info("Bot conectado a Binance Futures")
+        log.info(f"Estrategia: EMA{EMA_FAST}/{EMA_SLOW} Cross + RSI({RSI_PERIOD}) + EMA{EMA_TREND}")
+        log.info(f"Alavancagem: {LEVERAGE}x | Risco: {RISK_PER_TRADE*100:.0f}%/trade | R:R=1:{REWARD_RISK}")
         self._sync_open_positions()
 
     def _sync_open_positions(self):
-        """Ao iniciar, verifica se já tem posição aberta na Binance (evita abrir duplicata após restart)."""
         try:
             positions = self.client.futures_position_information()
             for p in positions:
                 amt = float(p["positionAmt"])
-                if amt == 0:
-                    continue
+                if amt == 0: continue
                 symbol = p["symbol"]
                 side   = "LONG" if amt > 0 else "SHORT"
                 entry  = float(p["entryPrice"])
                 qty    = abs(amt)
-                lot    = get_lot_size(self.client, symbol)
-                price  = get_futures_price(self.client, symbol)
                 stop_dist = 0.008
                 stop   = entry * (1 - stop_dist) if side == "LONG" else entry * (1 + stop_dist)
-                target = entry * (1 + stop_dist * REWARD_RISK_RATIO) if side == "LONG" else entry * (1 - stop_dist * REWARD_RISK_RATIO)
+                target = entry * (1 + stop_dist * REWARD_RISK) if side == "LONG" else entry * (1 - stop_dist * REWARD_RISK)
                 self.open_trade = {
                     "symbol": symbol, "side": side, "qty": qty,
                     "entry": entry, "stop": round(stop, 8), "target": round(target, 8),
                     "order_id": None, "opened_at": time.time(),
                 }
-                log.info(f"🔄 Posição existente detectada: {side} {symbol} | qty={qty} | entrada={entry:.4f}")
+                log.info(f"Posicao existente: {side} {symbol} | qty={qty} | entrada={entry:.4f}")
                 break
             if not self.open_trade:
-                log.info("📭 Nenhuma posição aberta encontrada. Pronto para operar.")
+                log.info("Nenhuma posicao aberta. Pronto para operar.")
         except BinanceAPIException as e:
-            log.error(f"Erro ao sincronizar posições: {e}")
+            log.error(f"Erro ao sincronizar: {e}")
 
     def run(self):
-        log.info("🚀 SuperTrend Scalp Bot iniciado")
+        log.info("EMA Scalp Bot iniciado")
         while True:
             try:
                 self._cycle()
@@ -278,11 +235,11 @@ class SuperTrendScalpBot:
                 log.error(f"Binance API error: {e}"); time.sleep(10)
             except Exception as e:
                 log.error(f"Erro: {e}", exc_info=True); time.sleep(10)
-            time.sleep(SCAN_INTERVAL_SEC)
+            time.sleep(SCAN_INTERVAL)
 
     def _cycle(self):
         balance = get_futures_balance(self.client)
-        log.info(f"💰 Saldo: ${balance:.2f} USDT")
+        log.info(f"Saldo: ${balance:.2f} USDT")
 
         if self.open_trade:
             t       = self.open_trade
@@ -290,35 +247,35 @@ class SuperTrendScalpBot:
             elapsed = time.time() - t["opened_at"]
             side    = t["side"]
             pnl     = ((price - t["entry"]) / t["entry"] * 100) * (1 if side == "LONG" else -1) * LEVERAGE
-            log.info(f"📊 {side} {t['symbol']} | {price:.4f} | PnL={pnl:+.2f}% | {elapsed:.0f}s")
+            log.info(f"{side} {t['symbol']} | {price:.4f} | PnL={pnl:+.2f}% | {elapsed:.0f}s")
 
             hit_stop   = price <= t["stop"]   if side == "LONG" else price >= t["stop"]
             hit_target = price >= t["target"] if side == "LONG" else price <= t["target"]
-            timeout    = elapsed >= MAX_TRADE_DURATION
+            timeout    = elapsed >= MAX_DURATION
 
             df      = get_klines(self.client, t["symbol"])
             signals = get_signals(df)
             st_exit = signals["exit_long"] if side == "LONG" else signals["exit_short"]
 
             if hit_stop or hit_target or timeout or st_exit:
-                reason = "STOP" if hit_stop else ("TARGET ✨" if hit_target else ("TIMEOUT" if timeout else "ST_FLIP"))
+                reason = "STOP" if hit_stop else ("TARGET" if hit_target else ("TIMEOUT" if timeout else "EMA_CROSS"))
                 self._close_trade(reason, price)
             return
 
         if balance < 1.0:
-            log.warning("⚠️  Saldo insuficiente."); return
+            log.warning("Saldo insuficiente."); return
 
         pairs = rank_pairs(self.client)
         if not pairs:
-            log.info("😴 Nenhum par com volume suficiente."); return
+            log.info("Nenhum par com volume suficiente."); return
 
-        log.info(f"🔎 Varrendo {len(pairs)} pares: {', '.join(pairs)}")
+        log.info(f"Varrendo {len(pairs)} pares: {', '.join(pairs)}")
         found = False
         for symbol in pairs:
             set_leverage(self.client, symbol, LEVERAGE)
             df      = get_klines(self.client, symbol)
             signals = get_signals(df)
-            log.info(f"  {symbol} | close={signals['close']} | ST={'🟢' if signals['st_dir']==1 else '🔴'} | RSI={signals['rsi']} | BUY={signals['buy']} SELL={signals['sell']}")
+            log.info(f"  {symbol} | close={signals['close']} | EMA9={signals['ema_fast']} EMA21={signals['ema_slow']} | RSI={signals['rsi']} | BUY={signals['buy']} SELL={signals['sell']}")
             if signals["buy"]:
                 self._open_trade(symbol, balance, "LONG", signals)
                 found = True; break
@@ -326,40 +283,54 @@ class SuperTrendScalpBot:
                 self._open_trade(symbol, balance, "SHORT", signals)
                 found = True; break
         if not found:
-            log.info("😴 Nenhum sinal em nenhum par. Aguardando...")
+            log.info("Nenhum sinal. Aguardando...")
 
     def _open_trade(self, symbol, balance, side, signals):
-        price     = get_futures_price(self.client, symbol)
-        lot       = get_lot_size(self.client, symbol)
-        st_line   = signals["st_line"]
-        stop_dist = max(abs(price - st_line) / price, 0.005)
-        stop      = price * (1 - stop_dist) if side == "LONG" else price * (1 + stop_dist)
-        target    = price * (1 + stop_dist * REWARD_RISK_RATIO) if side == "LONG" else price * (1 - stop_dist * REWARD_RISK_RATIO)
-        capital   = balance * RISK_PER_TRADE
-        qty       = round_step((capital * LEVERAGE) / price, lot["step_size"])
+        price    = get_futures_price(self.client, symbol)
+        lot      = get_lot_size(self.client, symbol)
+        atr      = signals["atr"]
+        stop_dist = max(atr * ATR_STOP_MULT / price, 0.005)
+        stop     = price * (1 - stop_dist) if side == "LONG" else price * (1 + stop_dist)
+        target   = price * (1 + stop_dist * REWARD_RISK) if side == "LONG" else price * (1 - stop_dist * REWARD_RISK)
+        capital  = balance * RISK_PER_TRADE
+        qty      = round_step((capital * LEVERAGE) / price, lot["step_size"])
         if qty < lot["min_qty"]:
-            log.warning(f"⚠️  Qty {qty} abaixo do mínimo {lot['min_qty']}"); return
+            log.warning(f"Qty {qty} abaixo do minimo {lot['min_qty']}"); return
 
-        # Filtro Gemini — confirma ou bloqueia a entrada
         raw_candles = get_klines(self.client, symbol).values.tolist()
         if not ask_gemini(symbol, side, signals, raw_candles):
-            log.info(f"🚫 Gemini bloqueou entrada em {side} {symbol}. Aguardando próxima oportunidade.")
+            log.info(f"Gemini bloqueou {side} {symbol}.")
             return
 
         try:
-            order = self.client.futures_create_order(symbol=symbol, side="BUY" if side=="LONG" else "SELL", type="MARKET", quantity=qty)
-            entry = float(order["avgPrice"]) if float(order.get("avgPrice",0)) > 0 else price
-            self.open_trade = {"symbol": symbol, "side": side, "qty": qty, "entry": entry, "stop": round(stop,8), "target": round(target,8), "order_id": order["orderId"], "opened_at": time.time()}
-            log.info(f"{'🟢 LONG' if side=='LONG' else '🔴 SHORT'} {symbol} | qty={qty} | entrada={entry:.4f} | stop={stop:.4f} ({stop_dist*100:.2f}%) | target={target:.4f} ({stop_dist*REWARD_RISK_RATIO*100:.2f}%) | {capital:.2f}x{LEVERAGE}")
+            order = self.client.futures_create_order(
+                symbol=symbol,
+                side="BUY" if side == "LONG" else "SELL",
+                type="MARKET",
+                quantity=qty
+            )
+            entry = float(order["avgPrice"]) if float(order.get("avgPrice", 0)) > 0 else price
+            self.open_trade = {
+                "symbol": symbol, "side": side, "qty": qty,
+                "entry": entry, "stop": round(stop, 8), "target": round(target, 8),
+                "order_id": order["orderId"], "opened_at": time.time()
+            }
+            log.info(f"{'LONG' if side=='LONG' else 'SHORT'} {symbol} | qty={qty} | entrada={entry:.4f} | stop={stop:.4f} ({stop_dist*100:.2f}%) | target={target:.4f} ({stop_dist*REWARD_RISK*100:.2f}%) | {capital:.2f}x{LEVERAGE}")
         except BinanceAPIException as e:
             log.error(f"Erro ao abrir: {e}")
 
     def _close_trade(self, reason, price):
         t = self.open_trade
         try:
-            self.client.futures_create_order(symbol=t["symbol"], side="SELL" if t["side"]=="LONG" else "BUY", type="MARKET", quantity=t["qty"], reduceOnly=True)
-            pnl = ((price - t["entry"]) / t["entry"] * 100) * (1 if t["side"]=="LONG" else -1) * LEVERAGE
-            log.info(f"⏹  FECHOU [{reason}] {t['symbol']} | saída={price:.4f} | PnL={pnl:+.2f}%")
+            self.client.futures_create_order(
+                symbol=t["symbol"],
+                side="SELL" if t["side"] == "LONG" else "BUY",
+                type="MARKET",
+                quantity=t["qty"],
+                reduceOnly=True
+            )
+            pnl = ((price - t["entry"]) / t["entry"] * 100) * (1 if t["side"] == "LONG" else -1) * LEVERAGE
+            log.info(f"FECHOU [{reason}] {t['symbol']} | saida={price:.4f} | PnL={pnl:+.2f}%")
         except BinanceAPIException as e:
             log.error(f"Erro ao fechar: {e}")
         finally:
@@ -367,5 +338,5 @@ class SuperTrendScalpBot:
 
 if __name__ == "__main__":
     if not API_KEY or not API_SECRET:
-        log.error("❌ Configure BINANCE_API_KEY e BINANCE_API_SECRET."); exit(1)
-    SuperTrendScalpBot().run()
+        log.error("Configure BINANCE_API_KEY e BINANCE_API_SECRET."); exit(1)
+    EMAScalpBot().run()
