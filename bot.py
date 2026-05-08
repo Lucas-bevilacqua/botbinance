@@ -250,277 +250,373 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚡ SCALP BOT</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚡ ScalpBot</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #080b0f;
-    --surface: #0d1117;
-    --border: #1e2730;
-    --green: #00ff88;
-    --red: #ff3355;
-    --yellow: #ffcc00;
-    --blue: #00aaff;
-    --text: #e2e8f0;
-    --muted: #4a5568;
+    --bg: #07090c;
+    --surface: #0e1318;
+    --surface2: #131920;
+    --border: #1c2530;
+    --green: #0df5a0;
+    --red: #ff2d55;
+    --yellow: #ffd60a;
+    --blue: #3b9eff;
+    --purple: #bf5af2;
+    --text: #dce8f5;
+    --muted: #3d5166;
+    --font: 'JetBrains Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --radius: 14px;
+    --pad: 16px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { font-size: 14px; }
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font);
     min-height: 100vh;
-    padding: 24px;
+    padding: 16px;
+    padding-bottom: 32px;
+    overflow-x: hidden;
   }
+
+  /* ── Header ── */
   header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
+    padding: 12px 0 16px;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 20px;
+    margin-bottom: 20px;
+    gap: 8px;
   }
-  h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
+  .logo {
+    font-family: var(--display);
+    font-size: clamp(20px, 5vw, 26px);
     font-weight: 800;
     letter-spacing: -1px;
+    white-space: nowrap;
   }
-  h1 span { color: var(--green); }
-  .live-dot {
-    width: 8px; height: 8px;
-    background: var(--green);
+  .logo span { color: var(--green); }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .dot {
+    width: 7px; height: 7px;
     border-radius: 50%;
-    display: inline-block;
-    margin-right: 8px;
-    animation: pulse 1.5s infinite;
+    background: var(--green);
+    animation: blink 1.8s ease-in-out infinite;
   }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.8); }
-  }
-  .grid-4 {
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* ── Cards grid ── */
+  .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 32px;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
   }
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-  }
-  .card-label {
-    font-size: 11px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 8px;
-  }
-  .card-value {
-    font-size: 28px;
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-  }
-  .card-value.green { color: var(--green); }
-  .card-value.red { color: var(--red); }
-  .card-value.yellow { color: var(--yellow); }
-  .card-value.blue { color: var(--blue); }
-  .section-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 16px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-  th {
-    text-align: left;
-    padding: 10px 12px;
-    color: var(--muted);
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-  }
-  td {
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  tr:hover td { background: rgba(255,255,255,0.02); }
-  .badge {
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
-  }
-  .badge-long { background: rgba(0,255,136,0.15); color: var(--green); }
-  .badge-short { background: rgba(255,51,85,0.15); color: var(--red); }
-  .badge-win { background: rgba(0,255,136,0.15); color: var(--green); }
-  .badge-loss { background: rgba(255,51,85,0.15); color: var(--red); }
-  .chart-container {
+    border-radius: var(--radius);
+    padding: var(--pad);
     position: relative;
-    height: 120px;
-    margin-bottom: 32px;
+    overflow: hidden;
   }
-  canvas { width: 100% !important; }
-  .two-col {
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .card.blue::before { background: var(--blue); }
+  .card.green::before { background: var(--green); }
+  .card.yellow::before { background: var(--yellow); }
+  .card.purple::before { background: var(--purple); }
+  .card-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+  .card-val {
+    font-family: var(--display);
+    font-size: clamp(20px, 6vw, 28px);
+    font-weight: 800;
+    line-height: 1;
+  }
+  .card-val.blue { color: var(--blue); }
+  .card-val.green { color: var(--green); }
+  .card-val.yellow { color: var(--yellow); }
+  .card-val.purple { color: var(--purple); }
+  .card-val.red { color: var(--red); }
+
+  /* ── Section title ── */
+  .sec {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+
+  /* ── Chart boxes ── */
+  .chart-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    position: relative;
+  }
+  .chart-wrap { position: relative; height: 110px; }
+
+  /* ── Resumo row ── */
+  .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 32px;
+    gap: 10px;
+    margin-bottom: 0;
   }
-  @media (max-width: 768px) {
-    .two-col { grid-template-columns: 1fr; }
-    .grid-4 { grid-template-columns: 1fr 1fr; }
+  .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .info-table td { padding: 8px 4px; border-bottom: 1px solid var(--border); }
+  .info-table td:first-child { color: var(--muted); }
+  .info-table td:last-child { text-align: right; font-weight: 700; }
+  .info-table tr:last-child td { border-bottom: none; }
+
+  /* ── Trades list (mobile-first cards) ── */
+  .trade-list { display: flex; flex-direction: column; gap: 8px; }
+  .trade-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
   }
-  .refresh-time {
-    font-size: 11px;
-    color: var(--muted);
+  .trade-card:active { background: var(--surface2); }
+  .trade-sym { font-family: var(--display); font-size: 13px; font-weight: 700; }
+  .trade-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .trade-pnl { text-align: right; }
+  .trade-pnl-pct { font-family: var(--display); font-size: 15px; font-weight: 800; }
+  .trade-pnl-usd { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .5px;
   }
-  .empty { color: var(--muted); text-align: center; padding: 32px; }
-  .pnl-pos { color: var(--green); }
-  .pnl-neg { color: var(--red); }
+  .b-long  { background: rgba(13,245,160,.12); color: var(--green); }
+  .b-short { background: rgba(255,45,85,.12);  color: var(--red); }
+  .b-ok    { background: rgba(13,245,160,.12); color: var(--green); }
+  .b-stop  { background: rgba(255,45,85,.12);  color: var(--red); }
+  .b-time  { background: rgba(59,158,255,.12); color: var(--blue); }
+
+  .empty { color: var(--muted); text-align: center; padding: 28px; font-size: 12px; }
+
+  /* ── Tablet / Desktop ── */
+  @media (min-width: 640px) {
+    body { padding: 24px; max-width: 900px; margin: 0 auto; }
+    .cards { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .chart-wrap { height: 130px; }
+    .info-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+    .trade-card { grid-template-columns: 56px 1fr 80px 80px auto; }
+  }
+  @media (min-width: 900px) {
+    .cards { gap: 16px; }
+  }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>⚡ SCALP<span>BOT</span></h1>
-  <div class="refresh-time">
-    <span class="live-dot"></span>
-    <span id="refresh-time">atualizando...</span>
+  <div class="logo">⚡ Scalp<span>Bot</span></div>
+  <div class="status">
+    <span class="dot"></span>
+    <span id="ts">--</span>
   </div>
 </header>
 
-<div class="grid-4" id="stats-cards">
-  <div class="card"><div class="card-label">Saldo</div><div class="card-value blue" id="balance">--</div></div>
-  <div class="card"><div class="card-label">Total PnL</div><div class="card-value" id="total-pnl">--</div></div>
-  <div class="card"><div class="card-label">Win Rate</div><div class="card-value yellow" id="win-rate">--</div></div>
-  <div class="card"><div class="card-label">Trades</div><div class="card-value" id="total-trades">--</div></div>
-</div>
-
-<div class="section-title">Saldo ao longo do tempo</div>
-<div class="chart-container card" style="padding:16px">
-  <canvas id="balanceChart"></canvas>
-</div>
-
-<div class="two-col">
-  <div>
-    <div class="section-title">Resumo</div>
-    <div class="card">
-      <table>
-        <tr><td style="color:var(--muted)">Wins</td><td id="wins" class="pnl-pos">--</td></tr>
-        <tr><td style="color:var(--muted)">Losses</td><td id="losses" class="pnl-neg">--</td></tr>
-        <tr><td style="color:var(--muted)">Estratégia</td><td style="color:var(--yellow)">EMA 5/13 + RSI(7)</td></tr>
-        <tr><td style="color:var(--muted)">Timeframe</td><td>1 minuto</td></tr>
-        <tr><td style="color:var(--muted)">Alavancagem</td><td>10x</td></tr>
-        <tr><td style="color:var(--muted)">Risco/trade</td><td>5%</td></tr>
-      </table>
-    </div>
+<!-- Cards -->
+<div class="cards">
+  <div class="card blue">
+    <div class="card-label">Saldo</div>
+    <div class="card-val blue" id="balance">--</div>
   </div>
-  <div>
-    <div class="section-title">PnL por trade</div>
-    <div class="card" style="height:200px;overflow:auto">
-      <canvas id="pnlChart"></canvas>
-    </div>
+  <div class="card green">
+    <div class="card-label">PnL Total</div>
+    <div class="card-val" id="total-pnl">--</div>
+  </div>
+  <div class="card yellow">
+    <div class="card-label">Win Rate</div>
+    <div class="card-val yellow" id="win-rate">--</div>
+  </div>
+  <div class="card purple">
+    <div class="card-label">Trades</div>
+    <div class="card-val purple" id="total-trades">--</div>
   </div>
 </div>
 
-<div class="section-title">Últimos trades</div>
-<div class="card">
-  <table>
-    <thead>
-      <tr>
-        <th>Par</th><th>Lado</th><th>Entrada</th><th>Saída</th>
-        <th>PnL%</th><th>PnL $</th><th>Motivo</th><th>Duração</th>
-      </tr>
-    </thead>
-    <tbody id="trades-body">
-      <tr><td colspan="8" class="empty">Carregando...</td></tr>
-    </tbody>
-  </table>
+<!-- Gráfico saldo -->
+<div class="sec">Saldo ao longo do tempo</div>
+<div class="chart-box">
+  <div class="chart-wrap"><canvas id="balChart"></canvas></div>
+</div>
+
+<!-- Resumo + PnL chart -->
+<div class="sec">Resumo</div>
+<div class="info-grid">
+  <div class="chart-box">
+    <table class="info-table">
+      <tr><td>Wins</td><td class="pos" id="wins">--</td></tr>
+      <tr><td>Losses</td><td class="neg" id="losses">--</td></tr>
+      <tr><td>Estratégia</td><td style="color:var(--yellow)">EMA 5/13</td></tr>
+      <tr><td>Timeframe</td><td>1 min</td></tr>
+      <tr><td>Alavancagem</td><td>10x</td></tr>
+      <tr><td>Risco</td><td>5% / trade</td></tr>
+    </table>
+  </div>
+  <div class="chart-box">
+    <div class="chart-wrap"><canvas id="pnlChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Trades -->
+<div class="sec">Últimos trades</div>
+<div class="trade-list" id="trades-list">
+  <div class="empty">Carregando...</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-let balanceChart, pnlChart;
+const C = {
+  bg:'#07090c', surface:'#0e1318', border:'#1c2530',
+  green:'#0df5a0', red:'#ff2d55', blue:'#3b9eff',
+  muted:'#3d5166', text:'#dce8f5'
+};
+const fontMono = { family:'JetBrains Mono', size:10 };
+
+let balChart, pnlChart;
+
+function mk(id, type, color, fill=false) {
+  return new Chart(document.getElementById(id).getContext('2d'), {
+    type,
+    data: { labels:[], datasets:[{
+      data:[], borderColor:color,
+      backgroundColor: fill ? color.replace(')',',0.12)').replace('rgb','rgba') : color+'33',
+      borderWidth:2, pointRadius:0, fill, tension:.4, borderRadius:4
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:false,
+      plugins:{ legend:{display:false}, tooltip:{
+        backgroundColor:'#131920', titleColor:C.text, bodyColor:C.muted,
+        borderColor:C.border, borderWidth:1,
+        callbacks:{ label: ctx => ' $'+Number(ctx.raw).toFixed(2) }
+      }},
+      scales:{
+        x:{ display:false },
+        y:{ ticks:{ color:C.muted, font:fontMono, maxTicksLimit:4 }, grid:{ color:C.border } }
+      }
+    }
+  });
+}
 
 function initCharts() {
-  const ctx1 = document.getElementById('balanceChart').getContext('2d');
-  balanceChart = new Chart(ctx1, {
-    type: 'line',
-    data: { labels: [], datasets: [{ label: 'Saldo USDT', data: [], borderColor: '#00aaff', backgroundColor: 'rgba(0,170,255,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#4a5568', font: { family: 'Space Mono', size: 10 } }, grid: { color: '#1e2730' } } } }
-  });
+  balChart = mk('balChart','line', C.blue, true);
+  pnlChart = mk('pnlChart','bar',  C.green);
+}
 
-  const ctx2 = document.getElementById('pnlChart').getContext('2d');
-  pnlChart = new Chart(ctx2, {
-    type: 'bar',
-    data: { labels: [], datasets: [{ label: 'PnL $', data: [], backgroundColor: [], borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#4a5568', font: { family: 'Space Mono', size: 10 } }, grid: { color: '#1e2730' } } } }
-  });
+function badgeSide(s) {
+  return `<span class="badge b-${s.toLowerCase()}">${s}</span>`;
+}
+function badgeReason(r) {
+  const cls = r==='STOP' ? 'b-stop' : r==='TIMEOUT' ? 'b-time' : 'b-ok';
+  return `<span class="badge ${cls}">${r}</span>`;
 }
 
 async function refresh() {
   try {
     const r = await fetch('/api/stats');
-    const data = await r.json();
-    const s = data.stats;
+    const d = await r.json();
+    const s = d.stats || {};
 
-    // Cards
-    const bal = data.balance_history.length ? data.balance_history[data.balance_history.length-1].balance : 0;
-    document.getElementById('balance').textContent = '$' + bal.toFixed(2);
+    const bal = d.balance_history?.length
+      ? d.balance_history[d.balance_history.length-1].balance : 0;
+
+    document.getElementById('balance').textContent = '$'+bal.toFixed(2);
+
+    const pnl = s.total_pnl || 0;
     const pnlEl = document.getElementById('total-pnl');
-    pnlEl.textContent = (s.total_pnl >= 0 ? '+' : '') + '$' + (s.total_pnl || 0).toFixed(4);
-    pnlEl.className = 'card-value ' + (s.total_pnl >= 0 ? 'green' : 'red');
-    document.getElementById('win-rate').textContent = (s.win_rate || 0) + '%';
-    document.getElementById('total-trades').textContent = s.total_trades || 0;
-    document.getElementById('wins').textContent = s.wins || 0;
-    document.getElementById('losses').textContent = s.losses || 0;
+    pnlEl.textContent = (pnl>=0?'+':'')+'$'+Math.abs(pnl).toFixed(4);
+    pnlEl.className = 'card-val '+(pnl>=0?'green':'red');
+
+    document.getElementById('win-rate').textContent = (s.win_rate||0)+'%';
+    document.getElementById('total-trades').textContent = s.total_trades||0;
+    document.getElementById('wins').textContent = s.wins||0;
+    document.getElementById('losses').textContent = s.losses||0;
 
     // Balance chart
-    const bh = data.balance_history;
-    balanceChart.data.labels = bh.map(b => b.ts.slice(11,16));
-    balanceChart.data.datasets[0].data = bh.map(b => b.balance);
-    balanceChart.update('none');
+    const bh = d.balance_history || [];
+    balChart.data.labels = bh.map(b=>b.ts.slice(11,16));
+    balChart.data.datasets[0].data = bh.map(b=>b.balance);
+    balChart.update('none');
 
     // PnL chart
-    const trades = data.trades.slice().reverse();
-    pnlChart.data.labels = trades.map(t => t.symbol);
-    pnlChart.data.datasets[0].data = trades.map(t => t.pnl);
-    pnlChart.data.datasets[0].backgroundColor = trades.map(t => t.pnl >= 0 ? 'rgba(0,255,136,0.7)' : 'rgba(255,51,85,0.7)');
+    const ts = (d.trades||[]).slice().reverse();
+    pnlChart.data.labels = ts.map(t=>t.symbol.replace('USDT',''));
+    pnlChart.data.datasets[0].data = ts.map(t=>t.pnl);
+    pnlChart.data.datasets[0].backgroundColor = ts.map(t=>t.pnl>=0?C.green+'99':C.red+'99');
     pnlChart.update('none');
 
-    // Trades table
-    const tbody = document.getElementById('trades-body');
-    if (!data.trades.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="empty">Nenhum trade registrado ainda</td></tr>';
+    // Trades list
+    const el = document.getElementById('trades-list');
+    if (!d.trades?.length) {
+      el.innerHTML = '<div class="empty">Nenhum trade ainda</div>';
     } else {
-      tbody.innerHTML = data.trades.map(t => `
-        <tr>
-          <td><b>${t.symbol}</b></td>
-          <td><span class="badge badge-${t.side.toLowerCase()}">${t.side}</span></td>
-          <td>${t.entry.toFixed(4)}</td>
-          <td>${t.exit ? t.exit.toFixed(4) : '--'}</td>
-          <td class="${t.pnl_pct >= 0 ? 'pnl-pos' : 'pnl-neg'}">${t.pnl_pct >= 0 ? '+' : ''}${(t.pnl_pct||0).toFixed(2)}%</td>
-          <td class="${t.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${t.pnl >= 0 ? '+' : ''}$${(t.pnl||0).toFixed(4)}</td>
-          <td><span class="badge ${t.reason=='STOP'?'badge-loss':'badge-win'}">${t.reason}</span></td>
-          <td>${t.duration}s</td>
-        </tr>`).join('');
+      el.innerHTML = d.trades.map(t => {
+        const ppos = t.pnl_pct >= 0;
+        const p$ = t.pnl >= 0;
+        return `<div class="trade-card">
+          <div>
+            ${badgeSide(t.side)}
+            <div class="trade-sym" style="margin-top:4px">${t.symbol.replace('USDT','')}</div>
+          </div>
+          <div>
+            <div class="trade-meta">${t.opened_at ? t.opened_at.slice(11,16) : '--'} &bull; ${t.duration}s &bull; ${badgeReason(t.reason)}</div>
+            <div class="trade-meta" style="margin-top:3px">entr: ${t.entry?.toFixed(4)} &rarr; ${t.exit?.toFixed(4)||'--'}</div>
+          </div>
+          <div class="trade-pnl">
+            <div class="trade-pnl-pct ${ppos?'pos':'neg'}">${ppos?'+':''}${(t.pnl_pct||0).toFixed(2)}%</div>
+            <div class="trade-pnl-usd ${p$?'pos':'neg'}">${p$?'+':''}$${Math.abs(t.pnl||0).toFixed(4)}</div>
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    document.getElementById('refresh-time').textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR');
-  } catch(e) {
-    console.error(e);
-  }
+    document.getElementById('ts').textContent = new Date().toLocaleTimeString('pt-BR');
+  } catch(e) { console.error(e); }
 }
 
 initCharts();
